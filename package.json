@@ -1,0 +1,52 @@
+{
+  "name": "d-vote",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^5.11.4",
+    "@testing-library/react": "^11.1.0",
+    "@testing-library/user-event": "^12.1.10",
+    "bootstrap": "^4.6.0",
+    "crypto-js": "^4.0.0",
+    "ganache-cli": "^6.12.2",
+    "react": "^17.0.1",
+    "react-bootstrap": "^1.4.3",
+    "react-dom": "^17.0.1",
+    "react-router-dom": "^5.2.0",
+    "react-scripts": "4.0.1",
+    "samlify": "^2.7.6",
+    "web-vitals": "^0.2.4",
+    "web3": "^1.3.3"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject",
+    "serve": "serve -s build",
+    "build-and-serve": "truffle migrate --network build --reset && yarn build && serve -s build",
+    "development": "truffle migrate --network development --reset && yarn start"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "description": "Election system based on blockchain technology.",
+  "repository": "https://github.com/joelvaz0x01/d-vote",
+  "author": "joelvaz0x01",
+  "license": "MIT"
+}

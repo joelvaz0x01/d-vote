@@ -1,41 +1,41 @@
 import React, { Component } from 'react';
-import Alert from 'react-bootstrap/Alert';
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-
+import { Formik } from "formik";
 
 class CandidateSelection extends Component {
-
-    handleSubmit = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        this.props.validateCandidate(this.candidateID.value);
-    };
-
     render() {
-        const { lastError, candidates } = this.props;
+        const { candidates } = this.props;
         return (
-            <>
-                { lastError
-                    ? <Alert variant="danger">
-                        {lastError}
-                    </Alert>
-                    : <></>
-                }
-                <Form onSubmit={this.handleSubmit}>
-                    <Form.Group controlId="candidate">
-                        <Form.Label>Selecione o candidato:</Form.Label>
-                        <Form.Control as="select" ref={input => { this.candidateID = input }}>
-                            { candidates.map((candidate, id) => {
-                                return <option key={id} value={id}>{candidate.name}</option>
-                            }) }
-                        </Form.Control>
-                    </Form.Group>
-                    <Button variant="success" type="submit" block>
-                        Seguinte
-                    </Button>
-                </Form>
-            </>
+            <Formik
+                onSubmit={ async (values, { setErrors }) => {
+                    const validation = this.props.candidates.find(candidate => values.candidate === candidate.name);
+                    !validation ? setErrors({ candidate: 'Por favor selecione um candidato válido' }) : this.props.validateCandidate(this.props.candidates.indexOf(validation));
+                }}
+                initialValues={{ candidate: this.props.candidates[0].name }}
+            >
+                {({ handleSubmit, handleChange, errors }) => (
+                    <Form onSubmit={handleSubmit}>
+                        <Form.Group controlId="candidate">
+                            <Form.Label>Selecione o candidato:</Form.Label>
+                            <Form.Control
+                                as="select"
+                                name="candidate"
+                                onChange={handleChange}
+                                isInvalid={!!errors.candidate}
+                            >
+                                { candidates.map((candidate, id) => {
+                                    return <option key={id}>{candidate.name}</option>
+                                }) }
+                            </Form.Control>
+                            <Form.Control.Feedback type="invalid">{errors.candidate}</Form.Control.Feedback>
+                        </Form.Group>
+                        <Button variant="success" type="submit" block>
+                            Seguinte
+                        </Button>
+                    </Form>
+                )}
+            </Formik>
         )
     }
 }

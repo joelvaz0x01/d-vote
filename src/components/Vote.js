@@ -79,7 +79,6 @@ class Vote extends Component {
                                     candidateID={this.props.candidateID}
                                     makeVote={this.props.makeVote}
                                     voter={this.props.voter}
-                                    lastError={this.props.lastError}
                                 />
                             </Suspense>
                         </>
@@ -106,7 +105,6 @@ class Vote extends Component {
                             <Suspense fallback={<LoadingSpinner />}>
                                 <CandidateSelection
                                     validateCandidate={this.props.validateCandidate}
-                                    lastError={this.props.lastError}
                                     candidates={this.props.candidates}
                                 />
                             </Suspense>

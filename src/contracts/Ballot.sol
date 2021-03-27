@@ -27,12 +27,13 @@ contract Ballot {
     mapping(address => Voter) public voters;
     mapping(string => Database) public users;
     Candidate[] public candidates;
-    //uint public endTime = block.timestamp + 120;
+    //uint public endTime = block.timestamp + 1;
     uint public endTime = block.timestamp + 86400; //86400 = 24 hours
     uint public totalVotes = 0;
     uint public candidatesCount = 0;
     uint public currentUsers = 0;
-    uint public maxUsers = 10;
+    //uint public maxUsers = 10;
+    uint public maxUsers = 2;
 
     modifier OnlyOwner() {
         require(msg.sender == owner, "You are not the owner");

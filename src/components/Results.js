@@ -18,7 +18,7 @@ class Results extends Component {
     }
 
     render() {
-        const { totalVotes, endCountdown, candidates, maxUsers } = this.props;
+        const { totalVotes, endCountdown, candidates, candidatesCount, maxUsers } = this.props;
         const { redirectHome } = this.state;
         
         if (redirectHome === true) { return <Redirect to="/" /> }
@@ -39,9 +39,9 @@ class Results extends Component {
         } else {
             return (
                 <>
-                    {candidates.length === 5
+                    {candidates.length === Number(candidatesCount)
                         ? <>
-                            <p>Resultados finais:</p>
+                            <h3>Resultados finais</h3>
                             <Table striped bordered hover size="sm">
                                 <thead>
                                     <tr>
@@ -52,11 +52,12 @@ class Results extends Component {
                                 </thead>
                                 <tbody>
                                     { candidates.map((candidate, id) => {
+                                        const votesPercentage = Number(candidate.voteCount / totalVotes * 100);
                                         return (
                                             <tr key={id}>
                                                 <td>{candidate.name}</td>
                                                 <td>{candidate.voteCount}</td>
-                                                <td>{Number(candidate.voteCount / totalVotes * 100).toFixed(2)}%</td>
+                                                <td>{votesPercentage ? votesPercentage.toFixed(2) : Number(0).toFixed(2)}%</td>
                                             </tr>
                                         )
                                     }) }

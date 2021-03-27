@@ -31,14 +31,6 @@ class App extends Component {
         if (this.state.startCountdown !== prevState.startCountdown) {
             this.countdown();
         }
-        //if (!this.state.loading && this.state.endCountdown.length !== 1) {
-            //corrigir codigo
-            //this.state.contract.methods.totalVotes().call().then(totalVotes => {
-                //if (totalVotes !== prevState.totalVotes) {
-                    //this.setState({ totalVotes: totalVotes });
-                //}
-            //});
-        //}
     }
     
     async loadBlockchainData() {
@@ -74,114 +66,89 @@ class App extends Component {
         this.setState({ votePage: pageIndex })
     }
 
-    updateCandidates = () => {
+    updateCandidates = async () => {
         this.setState({ candidates: [] });
-        this.state.contract.methods.candidatesCount().call().then(candidatesCount => {
-            for(let id = 0; id < candidatesCount; id++) {
-                this.state.contract.methods.candidates(id).call().then(candidate => {
-                    this.setState({ candidates: [...this.state.candidates, candidate] });
-                });
-            }
-        });    
+        const candidatesCount = await this.state.contract.methods.candidatesCount().call();
+        for(let id = 0; id < candidatesCount; id++) {
+            const candidate = await this.state.contract.methods.candidates(id).call()
+            this.setState({ candidates: [...this.state.candidates, candidate] });
+        }
     }
 
-    checkVoter = (IDnumber) => {
-        this.setState({ lastError: '' });
-        if (IDnumber) {
+    checkVoter = async (IDnumber) => {
+        //if (IDnumber) { //verificar se condicao if necessaria
+            let error;
             this.setState({ IDnumberSelected: IDnumber });
             IDnumber = web3.utils.soliditySha3(sha256(IDnumber).toString());
-            this.state.contract.methods.users(IDnumber).call().then(database => {
-                database.userID ? this.setState({ loginPage: 2 }) : this.setState({ loginPage: 1 });
-                this.setState({ databaseResults: database });
-            });
-        } else { this.setState({ lastError: 'Número de Identificação Civil inválido' }) }
+            const database = await this.state.contract.methods.users(IDnumber).call();
+            if (database.userID) {
+                this.setState({ loginPage: 2 });
+            } else {
+                const currentUsers = await this.state.contract.methods.currentUsers().call();
+                currentUsers < this.state.maxUsers ? this.setState({ loginPage: 1 }) : error = 'Já não é possível votar';
+            }
+            this.setState({ databaseResults: database });
+            return error;
+        //}
     }
 
-    getVoterAddress = (password, passwordConfirmation) => {
-        this.setState({ lastError: '' });
+    getVoterAddress = async (password) => {
+        const parsePassword = async (voter, password) => {
+            return web3.eth.personal.unlockAccount(voter, password, 1).then(async () => {
+                const voters = await this.state.contract.methods.voters(voter).call();
+                return voters.voted ? 'O eleitor ja votou' : this.setState({ voter });
+            }).catch(() => { return 'A password introduzida está incorreta' });
+        }
         let IDnumber = this.state.IDnumberSelected;
-        const currentTime = new Date().getTime();
-        if (currentTime < this.state.endTime) {
-            if (IDnumber) {
-                if (password) {
-                    if (password === passwordConfirmation) {
-                        IDnumber = web3.utils.soliditySha3(sha256(this.state.IDnumberSelected).toString());
-                        password = web3.utils.soliditySha3(sha256(password).toString());
-                        if (this.state.databaseResults.userID) {
-                            this.state.contract.methods.voters(this.state.databaseResults.voter).call().then(voters => {
-                                if (!voters.voted) {
-                                    parsePassword(this.state.databaseResults.voter, password);
-                                } else { this.setState({ lastError: 'Já votou' }) }
+        //const currentTime = new Date().getTime(); //verificar se necessaria
+        //if (currentTime < this.state.endTime) { //verificar se condicao if necessaria
+            //if (password === passwordConfirmation) {
+                IDnumber = web3.utils.soliditySha3(sha256(this.state.IDnumberSelected).toString());
+                password = web3.utils.soliditySha3(sha256(password).toString());
+                if (this.state.databaseResults.userID) {
+                    const voters = await this.state.contract.methods.voters(this.state.databaseResults.voter).call();
+                    return !voters.voted ? parsePassword(this.state.databaseResults.voter, password) : 'O eleitor ja votou'
+                } else {
+                    const newAccount = web3.eth.accounts.create(web3.utils.randomHex(32));
+                    return this.state.contract.methods.database(IDnumber, newAccount.address).estimateGas({ from: this.state.owner }).then(gasLimit => {
+                        this.state.contract.methods.database(IDnumber, newAccount.address).send({ from: this.state.owner, gas: gasLimit }).then(() => {
+                            web3.eth.personal.importRawKey(newAccount.privateKey, password);
+                            web3.eth.sendTransaction({ from: this.state.owner, gas: 21000, to: newAccount.address, value: web3.utils.toWei('1', 'ether') });
+                            return this.state.contract.methods.giveRightToVote(newAccount.address).send({ from: this.state.owner }).then(() => {
+                                return parsePassword(newAccount.address, password);
                             });
-                        } else {
-                            const newAccount = web3.eth.accounts.create(web3.utils.randomHex(32));
-                            this.state.contract.methods.database(IDnumber, newAccount.address).estimateGas({ from: this.state.owner }).then(gasLimit => {
-                                this.state.contract.methods.database(IDnumber, newAccount.address).send({ from: this.state.owner, gas: gasLimit }).then(() => {
-                                    web3.eth.personal.importRawKey(newAccount.privateKey, password);
-                                    web3.eth.sendTransaction({
-                                        from: this.state.owner,
-                                        gas: 21000, // Default gas for transactions
-                                        to: newAccount.address,
-                                        value: web3.utils.toWei('1', 'ether')
-                                    });
-                                    this.state.contract.methods.giveRightToVote(newAccount.address).send({ from: this.state.owner }).then(() => {
-                                        parsePassword(newAccount.address, password);
-                                    });
-                                }).catch(() => { this.setState({ lastError: 'Já não podem votar mais utilizadores' }) });
-                            }).catch(() => { this.setState({ lastError: 'Já não podem votar mais utilizadores' }) });
-                        }
-                    } else { this.setState({ lastError: 'As passwords não coincidem' }) }
-                } else { this.setState({ lastError: 'Password inválida' }) }
-            } else { this.setState({ lastError: 'Ocorreu um erro' }) }
-        } else { this.setState({ lastError: 'Já não é possivel votar' }) }
-        const parsePassword = (voter, password) => {
-            web3.eth.personal.unlockAccount(voter, password, 1).then(() => {
-                this.state.contract.methods.voters(voter).call().then(voters => {
-                    voters.voted ? this.setState({ lastError: 'Já votou' }) : this.setState({ voter })
-                });
-            }).catch(() => { this.setState({ lastError: 'Password incorreta' }) })
+                        }).catch(() => { return 'Já não podem votar mais utilizadores' });
+                    }).catch(() => { return 'Já não podem votar mais utilizadores' });
+                }
+            //}
+        //} else { return 'Já não podem votar mais utilizadores' }
+    }
+
+    validateCandidate = async (candidateID) => {
+        const candidate = await this.state.contract.methods.candidates(candidateID).call();
+        this.setState({ candidateID });
+        this.setState({ candidateName: candidate.name });
+        this.setState({ isCandidateValid: true });
+    }
+
+    makeVote = async (voterAddress, voteIndex, password) => {
+        const sendEtherBack = async (voter, owner, password) => {
+            const voterBalance = await web3.eth.getBalance(voter)
+            const totalToSpend = voterBalance - this.state.gasPrice * 21000;
+            web3.eth.personal.sendTransaction({ from: voter, gas: 21000, to: owner, value: totalToSpend }, password);
+            web3.eth.personal.lockAccount(voter);
         }
-    }
-
-    validateCandidate = (candidateID) => {
-        this.setState({ lastError: '' });
-        this.state.contract.methods.candidates(candidateID).call().then(candidate => {
-            this.setState({ candidateID })
-            this.setState({ candidateName: candidate.name });
-            this.setState({ isCandidateValid: true });
-        }).catch(() => {
-            this.setState({ lastError: 'Candidato inválido' }) 
-        });
-    }
-
-    makeVote = (voterAddress, voteIndex, password) => {
         password = web3.utils.soliditySha3(sha256(password).toString());
-        this.setState({ lastError: '' });
-        web3.eth.personal.unlockAccount(voterAddress, password).then(() => {
+        return web3.eth.personal.unlockAccount(voterAddress, password, 1).then(async () => {
             this.state.contract.methods.vote(voteIndex).estimateGas({ from: voterAddress }).then(gasLimit => {
-                this.state.contract.methods.vote(voteIndex).send({ from: voterAddress, gas: gasLimit }).then(() => {
-                    this.state.contract.methods.totalVotes().call().then(totalVotes => {
-                        sendEtherBack(voterAddress, password, this.state.owner);
-                        this.setState({ totalVotes });
-                        web3.eth.personal.lockAccount(voterAddress);
-                        this.setState({ isVoteSuccessful: true });
-                    });
+                this.state.contract.methods.vote(voteIndex).send({ from: voterAddress, gas: gasLimit }).then(async () => {
+                    const totalVotes = await this.state.contract.methods.totalVotes().call();
+                    sendEtherBack(voterAddress, this.state.owner, password);
+                    this.setState({ totalVotes });
+                    this.setState({ isVoteSuccessful: true });
                 });
             });
-        }).catch(() => { this.setState({ lastError: 'Password incorreta' }) });
-        const sendEtherBack = (voter, voterPassword, owner) => {
-            web3.eth.getBalance(voter).then(balance => {
-                const totalToSpend = balance - this.state.gasPrice * 21000;
-                web3.eth.personal.unlockAccount(voter, voterPassword).then(() => {
-                    web3.eth.sendTransaction({
-                        from: voter,
-                        gas: 21000, // Default gas for transactions
-                        to: owner,
-                        value: totalToSpend
-                    });
-                });
-            });
-        }
+        }).catch(() => { return 'A password introduzida está incorreta' })
     }
 
     logoutVoter = () => {
@@ -189,7 +156,6 @@ class App extends Component {
         this.setState({ votePage: 0 });
         this.setState({ loginPage: 0 });
         this.setState({ IDnumberSelected: '' });
-        this.setState({ lastError: '' });
     }
 
     countdown = () => {
@@ -203,7 +169,7 @@ class App extends Component {
             this.setState({ endCountdown: [hours, minutes, seconds] })
             if (hours <= 0 && minutes <= 0 && seconds <= 0) {
                 clearInterval(countdown);
-                this.setState({ endCountdown: ["O tempo para exercer o voto terminou"] });
+                this.setState({ endCountdown: ['O tempo para exercer o voto terminou'] });
                 this.setState({ voter: '' });
             }
         }
@@ -228,7 +194,6 @@ class App extends Component {
             endTime: 0,
             startCountdown: false,
             endCountdown: [],
-            lastError: '',
             isVoteSuccessful: false,
             isCandidateValid: false,
             loading: true
@@ -258,20 +223,18 @@ class App extends Component {
                                                 <Route path="/login" render={
                                                     () => <><Login
                                                         voter={this.state.voter}
-                                                        lastError={this.state.lastError}
                                                         loginPage={this.state.loginPage}
                                                         IDnumberSelected={this.state.IDnumberSelected}
                                                         logoutVoter={this.logoutVoter}
                                                         checkVoter={this.checkVoter}
                                                         getVoterAddress={this.getVoterAddress}
+                                                        endCountdown={this.state.endCountdown}
                                                     /><p>&nbsp;</p></> }>
                                                 </Route>
                                                 <Route path="/vote" render={
                                                     () => <><Vote
-                                                        lastError={this.state.lastError}
                                                         candidates={this.state.candidates}
                                                         voter={this.state.voter}
-                                                        isCandidateValid={this.state.isCandidateValid}
                                                         candidateID={this.state.candidateID}
                                                         makeVote={this.makeVote}
                                                         candidateName={this.state.candidateName}
